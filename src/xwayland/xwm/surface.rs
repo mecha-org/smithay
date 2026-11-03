@@ -293,6 +293,9 @@ pub enum WmWindowProperty {
     Pid,
     Opacity,
     FrameExtents,
+    /// An unrecognized atom changed; forwarded so the compositor can react to
+    /// compositor/application-specific properties.
+    Other(Atom),
 }
 
 /// https://x.org/releases/X11R7.6/doc/xorg-docs/specs/ICCCM/icccm.html#input_focus
@@ -880,7 +883,7 @@ impl X11Surface {
     /// Note that XWayland will only set this if it was unable to bind the
     /// [xwayland shell](crate::wayland::xwayland_shell) protocol on the wayland
     /// side.
-    #[deprecated = "Since XWayland 23.1, the recommended approach is to use [wl_surface_serial] and the [xwayland shell](crate::wayland::xwayland_shell) protocol on the wayland side to match X11 windows."]
+    #[deprecated = "Since XWayland 23.1, the recommended approach is to use [wl_surface_serial](X11Surface::wl_surface_serial) and the [xwayland shell](crate::wayland::xwayland_shell) protocol on the wayland side to match X11 windows."]
     pub fn wl_surface_id(&self) -> Option<u32> {
         self.state.lock().unwrap().wl_surface_id
     }
@@ -1612,7 +1615,7 @@ impl X11Surface {
                 Ok(Some(WmWindowProperty::FrameExtents))
             }
 
-            _ => Ok(None), // unknown
+            _ => Ok(Some(WmWindowProperty::Other(atom))),
         }
     }
 
