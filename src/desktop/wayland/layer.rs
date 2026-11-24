@@ -364,7 +364,13 @@ impl LayerMap {
 
                 let location: Point<i32, Logical> = (x.0, y.0).into();
 
-                if let ExclusiveZone::Exclusive(amount) = data.exclusive_zone {
+                // An ignored zone reserves nothing; the surface itself is placed as usual.
+                let reserved = if layer.exclusive_zone_ignored() {
+                    ExclusiveZone::Neutral
+                } else {
+                    data.exclusive_zone
+                };
+                if let ExclusiveZone::Exclusive(amount) = reserved {
                     let amount = Saturating(amount as i32);
 
                     match effective_exclusive_edge(&data) {
@@ -481,6 +487,8 @@ fn implied_exclusive_edge_for_anchor(anchor: Anchor) -> Option<Anchor> {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LayerState {
     pub location: Option<Point<i32, Logical>>,
+    /// See [`LayerSurface::set_exclusive_zone_ignored`].
+    pub exclusive_zone_ignored: bool,
 }
 
 type LayerUserdata = Mutex<LayerState>;
@@ -734,6 +742,26 @@ impl LayerSurface {
     /// Returns a [`UserDataMap`] to allow associating arbitrary data with this surface.
     pub fn user_data(&self) -> &UserDataMap {
         &self.0.userdata
+    }
+
+    /// Make the [`LayerMap`] ignore this surface's exclusive zone, or heed it again.
+    ///
+    /// An ignored zone reserves no space when the map arranges its surfaces: the others
+    /// are placed as if this one had none. The surface itself is still placed and
+    /// configured as usual. This is compositor policy, for a surface it does not show,
+    /// say; the client's own state is untouched. It takes effect at the next
+    /// [`LayerMap::arrange`]. Returns whether it changed.
+    pub fn set_exclusive_zone_ignored(&self, ignored: bool) -> bool {
+        let mut state = layer_state(self);
+        let changed = state.exclusive_zone_ignored != ignored;
+        state.exclusive_zone_ignored = ignored;
+        changed
+    }
+
+    /// Whether this surface's exclusive zone is ignored, see
+    /// [`LayerSurface::set_exclusive_zone_ignored`].
+    pub fn exclusive_zone_ignored(&self) -> bool {
+        layer_state(self).exclusive_zone_ignored
     }
 
     /// Returns the exclusive zone set for the layer; except if an exclusive zone is set
